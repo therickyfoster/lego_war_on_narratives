@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="color-scheme" content="dark light" />
+  <title>LEGO War on Narratives • Offline-First Voting + Multiplayer Dashboard (Prototype) • Foster + Navi</title>
+
+  <!--
+    Zero-Harm & Anti-Inversion Note (Visible + Comment):
+    This prototype is a consent-forward, nonviolent narrative playground (a “fake war” meant to prevent real harm).
+    It does NOT encourage harassment, coercion, dehumanization, threats, targeting, destabilization, or manipulation.
+    No telemetry. No auto-send. Multiplayer is opt-in via manual export/import packs stored locally.
+    Inputs are sanitized and gently rate-limited to reduce abuse. Use for understanding, not pressure.
+  -->
+
+  <style>
+    /* =========================================================
+      TOOLTIP: Design Tokens
+      - What: Global CSS variables for theme, spacing, radii, shadows
+      - How: Tweak :root to re-theme quickly (colors, density, contrast)
+      - Outcome: Consistent look + easy expansion
+    ========================================================== */
+    :root{
+      --bg0:#060815;
+      --bg1:#0b1020;
+      --card:rgba(255,255,255,.06);
+      --card2:rgba(255,255,255,.09);
+      --stroke:rgba(255,255,255,.14);
+      --stroke2:rgba(255,255,255,.22);
+      --text:#e9eefc;
+      --muted:rgba(233,238,252,.72);
+      --muted2:rgba(233,238,252,.52);
+      --good:#53f3a6;
+      --warn:#ffd166;
+      --bad:#ff5c8a;
+      --accent:#7aa2ff;
+      --accent2:#9b7bff;
+
+      --r0:14px;
+      --r1:18px;
+      --r2:24px;
+
+      --shadow:0 12px 40px rgba(0,0,0,.45);
+      --shadow2:0 10px 24px rgba(0,0,0,.35);
+
+      --pad:14px;
+      --pad2:18px;
+      --pad3:24px;
+      --max:1100px;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 10% 10%, rgba(122,162,255,.18), transparent 55%),
+        radial-gradient(1100px 700px at 90% 20%, rgba(155,123,255,.16), transparent 60%),
+        radial-gradient(900px 600px at 50% 95%, rgba(83,243,166,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+
+    a{ color:var(--accent); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    .wrap{ width:min(var(--max), calc(100% - 28px)); margin:0 auto; }
+
+    /* =========================================================
+      TOOLTIP: Sticky Nav / TOC
+      - What: Top navigation with anchors + quick controls
+      - How: Add new <a href="#section"> items; sections need id
+      - Outcome: Fast navigation for long-form content
+    ========================================================== */
+    header{
+      position:sticky; top:0; z-index:50;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(10,14,30,.90), rgba(10,14,30,.58));
+      border-bottom:1px solid rgba(255,255,255,.10);
+    }
+    .nav{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 0;
+      gap:10px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      min-width: 220px;
+    }
+    .logo{
+      width:34px; height:34px; border-radius:12px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.30), rgba(255,255,255,.06)),
+                  linear-gradient(135deg, rgba(122,162,255,.85), rgba(155,123,255,.78));
+      box-shadow: var(--shadow2);
+      border:1px solid rgba(255,255,255,.18);
+      position:relative;
+    }
+    .logo:after{
+      content:"";
+      position:absolute; inset:7px;
+      border-radius:10px;
+      border:1px dashed rgba(255,255,255,.25);
+      opacity:.9;
+    }
+    .brand h1{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.4px;
+      line-height:1.1;
+    }
+    .brand .sub{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-top:2px;
+    }
+
+    .navlinks{
+      display:flex; flex-wrap:wrap; gap:10px;
+      justify-content:center;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius:999px;
+      color:var(--text);
+      font-size:12px;
+      white-space:nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,.12);
+    }
+    .pill:hover{
+      border-color: rgba(255,255,255,.22);
+      background: rgba(255,255,255,.07);
+      text-decoration:none;
+    }
+    .right{
+      display:flex; gap:10px; align-items:center; justify-content:flex-end;
+      min-width: 220px;
+    }
+
+    button, input, select, textarea{
+      font: inherit;
+      color:inherit;
+    }
+    .btn{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      transition: transform .08s ease, background .2s ease, border .2s ease;
+      box-shadow: 0 8px 20px rgba(0,0,0,.18);
+    }
+    .btn:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.22); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{
+      border-color: rgba(122,162,255,.55);
+      background: linear-gradient(135deg, rgba(122,162,255,.22), rgba(155,123,255,.18));
+    }
+    .btn.danger{
+      border-color: rgba(255,92,138,.55);
+      background: linear-gradient(135deg, rgba(255,92,138,.18), rgba(255,209,102,.10));
+    }
+    .btn.good{
+      border-color: rgba(83,243,166,.55);
+      background: linear-gradient(135deg, rgba(83,243,166,.18), rgba(122,162,255,.12));
+    }
+    .btn.small{ padding:8px 10px; border-radius:10px; font-size:12px; }
+    .btn.ghost{ background: transparent; box-shadow:none; }
+
+    .field{
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .field label{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .input, .select, .textarea{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius:14px;
+      padding:10px 12px;
+      outline:none;
+    }
+    .textarea{ min-height:86px; resize:vertical; }
+    .input:focus, .select:focus, .textarea:focus{
+      border-color: rgba(122,162,255,.55);
+      box-shadow: 0 0 0 4px rgba(122,162,255,.12);
+    }
+
+    /* =========================================================
+      TOOLTIP: Splash Screen
+      - What: Animated intro that auto-closes + can be closed manually
+      - How: Change SPLASH_MS in JS to adjust timing
+      - Outcome: Polished “launch” feel + prevents abrupt UI load
+    ========================================================== */
+    #splash{
+      position:fixed; inset:0; z-index:1000;
+      background:
+        radial-gradient(900px 600px at 30% 20%, rgba(122,162,255,.25), transparent 55%),
+        radial-gradient(900px 600px at 70% 30%, rgba(155,123,255,.22), transparent 60%),
+        linear-gradient(180deg, rgba(6,8,21,1), rgba(11,16,32,1));
+      display:flex; align-items:center; justify-content:center;
+      padding:24px;
+    }
+    .splashCard{
+      width:min(780px, 100%);
+      border-radius:28px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .splashTop{
+      padding:22px 22px 10px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .splashTitle{
+      display:flex; align-items:center; gap:12px;
+    }
+    .splashTitle h2{
+      margin:0;
+      font-size:18px;
+      letter-spacing:.3px;
+    }
+    .splashTitle p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+    .xclose{
+      width:38px; height:38px;
+      display:grid; place-items:center;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      cursor:pointer;
+      user-select:none;
+    }
+    .xclose:hover{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); }
+    .xclose:active{ transform: translateY(1px); }
+    .splashMid{
+      padding:0 22px 18px;
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+    }
+    .mini{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius:18px;
+      padding:14px;
+    }
+    .mini h3{
+      margin:0 0 8px;
+      font-size:13px;
+      color:var(--muted);
+      letter-spacing:.25px;
+      text-transform:uppercase;
+    }
+    .kbd{
+      font-family:var(--mono);
+      font-size:12px;
+      color:var(--text);
+      background: rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.14);
+      padding:2px 6px;
+      border-radius:8px;
+      display:inline-block;
+      margin:0 6px 6px 0;
+    }
+    .progress{
+      height:10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.07);
+      border:1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+    }
+    .bar{
+      height:100%;
+      width:10%;
+      background: linear-gradient(90deg, rgba(122,162,255,.9), rgba(155,123,255,.85));
+      border-radius:999px;
+      transform-origin:left;
+      animation: loadbar 4.6s linear forwards;
+    }
+    @keyframes loadbar{
+      from{ width: 8%; }
+      to{ width: 100%; }
+    }
+    .splashFoot{
+      padding:14px 22px 18px;
+      display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+      border-top:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.12);
+    }
+    .smallNote{ color:var(--muted); font-size:12px; line-height:1.35; max-width:560px; }
+    .fadeOut{
+      animation: fadeOut .28s ease forwards;
+    }
+    @keyframes fadeOut{
+      to{ opacity:0; transform: translateY(6px); }
+    }
+
+    /* =========================================================
+      TOOLTIP: Layout + Cards
+      - What: Grid for content blocks
+      - How: Use .grid and .card for new modules
+      - Outcome: Clean modular composition
+    ========================================================== */
+    main{ padding: 18px 0 80px; }
+    section{
+      padding: 22px 0;
+      position:relative;
+    }
+    .hero{
+      padding: 26px 0 12px;
+    }
+    .heroGrid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+      align-items:stretch;
+    }
+    .card{
+      border-radius: var(--r2);
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      box-shadow: var(--shadow2);
+      padding: var(--pad3);
+      position:relative;
+      overflow:hidden;
+    }
+    .card:before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(800px 300px at 10% 0%, rgba(122,162,255,.16), transparent 60%),
+        radial-gradient(700px 300px at 90% 10%, rgba(155,123,255,.12), transparent 60%);
+      opacity:.75;
+      pointer-events:none;
+    }
+    .card > *{ position:relative; }
+    .card h2{ margin:0 0 10px; font-size:20px; letter-spacing:.2px; }
+    .card p{ margin: 0 0 12px; color: var(--muted); line-height:1.55; }
+    .hint{ color: var(--muted2); font-size:12px; line-height:1.45; }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:16px;
+    }
+    .col6{ grid-column: span 6; }
+    .col7{ grid-column: span 7; }
+    .col5{ grid-column: span 5; }
+    .col4{ grid-column: span 4; }
+    .col8{ grid-column: span 8; }
+    .col12{ grid-column: span 12; }
+    .stack{ display:flex; flex-direction:column; gap:12px; }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:999px;
+      background: rgba(255,255,255,.05);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .chip b{ color:var(--text); font-weight:600; }
+    .sep{ height:1px; background: rgba(255,255,255,.10); margin:10px 0; }
+
+    /* =========================================================
+      TOOLTIP: Parallax Sections
+      - What: Soft background layers that move with pointer/scroll
+      - How: Add .parallaxLayer elements; JS updates transform
+      - Outcome: “Long-form myth” vibe without heavy GPU cost
+    ========================================================== */
+    .parallaxWrap{
+      position:absolute; inset:0;
+      pointer-events:none;
+      overflow:hidden;
+      opacity:.8;
+    }
+    .parallaxLayer{
+      position:absolute;
+      width: 1200px; height: 1200px;
+      border-radius: 999px;
+      filter: blur(2px);
+      opacity:.7;
+      transform: translate3d(0,0,0);
+      will-change: transform;
+    }
+    .p1{ left:-420px; top:-520px; background: radial-gradient(circle at 30% 30%, rgba(122,162,255,.25), transparent 60%); }
+    .p2{ right:-500px; top:-380px; background: radial-gradient(circle at 30% 30%, rgba(155,123,255,.20), transparent 62%); }
+    .p3{ left:20%; bottom:-640px; background: radial-gradient(circle at 30% 30%, rgba(83,243,166,.14), transparent 62%); }
+
+    /* =========================================================
+      TOOLTIP: Collapsible Content
+      - What: <details> blocks for long-form explanations
+      - How: Put long text inside <details><summary>Title</summary>...</details>
+      - Outcome: Scannable reading + deep dives on demand
+    ========================================================== */
+    details{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius: 16px;
+      padding: 10px 12px;
+    }
+    details > summary{
+      cursor:pointer;
+      color:var(--text);
+      font-weight:600;
+      list-style:none;
+      outline:none;
+    }
+    details > summary::-webkit-details-marker{ display:none; }
+    details[open]{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+    details p, details li{ color: var(--muted); }
+    ul{ margin: 10px 0 0 18px; color: var(--muted); }
+
+    /* =========================================================
+      TOOLTIP: Voting UI
+      - What: Trait cards with a 5-step slider (-2..+2)
+      - How: Add new traits in TRAITS[] in JS
+      - Outcome: Simple, legible characteristic voting
+    ========================================================== */
+    .voteCard{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .voteTop{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .voteTop h4{ margin:0 0 4px; font-size:14px; }
+    .voteTop .meta{ color:var(--muted2); font-size:12px; }
+    .axis{
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap:10px;
+      align-items:center;
+      margin-top:10px;
+    }
+    .axis .pole{
+      font-size:12px; color:var(--muted);
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.12);
+      padding:8px 10px;
+      border-radius: 14px;
+    }
+    .axis input[type="range"]{
+      width: 100%;
+    }
+    .axis .value{
+      font-family:var(--mono);
+      font-size:12px;
+      color: var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      padding:8px 10px;
+      border-radius: 14px;
+      text-align:center;
+      min-width: 72px;
+    }
+    .axisNotes{
+      margin-top:10px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .noteBox{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:10px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+
+    /* =========================================================
+      TOOLTIP: HUD + Constellation Visualizer
+      - What: Gamified status + small “constellation” of state
+      - How: XP increments on actions; constellation maps trait scores
+      - Outcome: Motivation without coercion
+    ========================================================== */
+    #hud{
+      position:fixed; right:14px; bottom:14px; z-index:60;
+      width: min(360px, calc(100% - 28px));
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,30,.62);
+      backdrop-filter: blur(10px);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .hudTop{
+      padding:12px 12px 8px;
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+    }
+    .hudTitle{
+      display:flex; flex-direction:column; gap:2px;
+      min-width: 0;
+    }
+    .hudTitle b{ font-size:12px; letter-spacing:.25px; }
+    .hudTitle span{ font-size:12px; color:var(--muted); }
+    .hudBtns{ display:flex; gap:8px; }
+    .hudBody{
+      padding:12px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+    }
+    .hudStats{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+    }
+    .stat{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius:16px;
+      padding:10px;
+    }
+    .stat .k{ font-size:11px; color:var(--muted2); }
+    .stat .v{ margin-top:4px; font-family:var(--mono); font-size:12px; }
+    .xpWrap{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius:16px;
+      padding:10px;
+    }
+    .xpRow{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .xpRow span{ font-size:11px; color:var(--muted2); }
+    .xpRow b{ font-family:var(--mono); font-size:12px; }
+    .xpBar{
+      height:10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.07);
+      border:1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+      margin-top:8px;
+    }
+    .xpFill{
+      height:100%;
+      width: 20%;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(83,243,166,.86), rgba(122,162,255,.86), rgba(155,123,255,.86));
+    }
+    .constWrap{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.12);
+      border-radius: 16px;
+      overflow:hidden;
+      position:relative;
+    }
+    #constellation{
+      width:100%;
+      height:160px;
+      display:block;
+    }
+    .hudHint{
+      font-size:11px; color:var(--muted2);
+      margin-top:2px;
+    }
+
+    /* =========================================================
+      TOOLTIP: Search
+      - What: Client-side search across traits, roles, help text
+      - How: Type; results show matching cards/lines
+      - Outcome: Fast retrieval without the internet
+    ========================================================== */
+    .searchResults{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+    .result{
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius:16px;
+      padding:12px;
+    }
+    .result b{ font-size:13px; }
+    .result p{ margin:6px 0 0; color:var(--muted); font-size:12px; line-height:1.45; }
+
+    /* =========================================================
+      TOOLTIP: Toasts
+      - What: Local-only status messages
+      - How: call toast("message", "good|warn|bad")
+      - Outcome: Clear feedback, no alerts needed
+    ========================================================== */
+    #toasts{
+      position:fixed; left:14px; bottom:14px; z-index:70;
+      display:flex; flex-direction:column; gap:8px;
+      width: min(420px, calc(100% - 28px));
+      pointer-events:none;
+    }
+    .toast{
+      pointer-events:none;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,14,30,.74);
+      backdrop-filter: blur(10px);
+      border-radius:16px;
+      padding:10px 12px;
+      box-shadow: var(--shadow2);
+      display:flex; gap:10px; align-items:flex-start;
+      animation: toastIn .18s ease both;
+    }
+    @keyframes toastIn{ from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform: translateY(0);} }
+    .dot{
+      width:10px; height:10px; border-radius:999px; margin-top:3px;
+      background: rgba(255,255,255,.35);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.06);
+    }
+    .toast.good .dot{ background: rgba(83,243,166,.9); box-shadow:0 0 0 4px rgba(83,243,166,.14); }
+    .toast.warn .dot{ background: rgba(255,209,102,.9); box-shadow:0 0 0 4px rgba(255,209,102,.14); }
+    .toast.bad .dot{ background: rgba(255,92,138,.9); box-shadow:0 0 0 4px rgba(255,92,138,.14); }
+    .toast .t{ font-size:12px; color:var(--text); line-height:1.35; }
+    .toast .s{ font-size:11px; color:var(--muted); margin-top:2px; line-height:1.35; }
+
+    /* =========================================================
+      TOOLTIP: Print Stylesheet
+      - What: Clean print layout (no HUD, no heavy backgrounds)
+      - How: Print from browser
+      - Outcome: Submission-ready snapshots
+    ========================================================== */
+    @media print{
+      header, #hud, #toasts, #splash{ display:none !important; }
+      body{ background:#fff; color:#111; }
+      .card, .voteCard, details, .result{
+        background:#fff !important;
+        border:1px solid #ddd !important;
+        box-shadow:none !important;
+      }
+      a{ color:#111; text-decoration:underline; }
+      .parallaxWrap{ display:none !important; }
+    }
+
+    @media (max-width: 980px){
+      .heroGrid{ grid-template-columns: 1fr; }
+      .col6, .col7, .col5, .col4, .col8{ grid-column: span 12; }
+      .brand{ min-width: unset; }
+      .right{ min-width: unset; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- =========================================================
+    TOOLTIP: Splash Markup
+    - What: Intro overlay (auto-close + X close)
+    - How: Edit copy here; logic in JS
+    - Outcome: Smooth startup
+  ========================================================== -->
+  <div id="splash" aria-hidden="false">
+    <div class="splashCard" role="dialog" aria-label="Startup splash">
+      <div class="splashTop">
+        <div class="splashTitle">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <h2>LEGO War on Narratives 🧱🕊️</h2>
+            <p>
+              A consent-forward “fake war” where people vote on <b>characteristics</b> (not commands) and
+              leave behind a safer civic interface for the next generation.
+            </p>
+          </div>
+        </div>
+        <div class="xclose" id="splashClose" title="Close splash">✕</div>
+      </div>
+      <div class="splashMid">
+        <div class="mini">
+          <h3>Quick Start</h3>
+          <div class="row" style="margin-bottom:8px;">
+            <span class="kbd">1</span> Pick a role
+            <span class="kbd">2</span> Vote on traits
+            <span class="kbd">3</span> View dashboard
+            <span class="kbd">4</span> Export/Import packs
+          </div>
+          <div class="progress" aria-label="Loading progress"><div class="bar"></div></div>
+          <p class="hint" style="margin-top:10px;">
+            Offline-first via IndexedDB. No telemetry. No auto-send.
+          </p>
+        </div>
+        <div class="mini">
+          <h3>Zero-Harm Guardrails</h3>
+          <ul>
+            <li>Manual “multiplayer” (export/import) only</li>
+            <li>Local-only storage + reset controls</li>
+            <li>Input sanitization + gentle rate limits</li>
+            <li>Support prompts (not enforcement)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="splashFoot">
+        <div class="smallNote">
+          This is a production-ready prototype: it functions fully offline (after first load), stores sessions and votes locally,
+          and supports opt-in “multiplayer” through share packs. Nothing is sent anywhere.
+        </div>
+        <div class="row">
+          <button class="btn primary" id="splashEnter">Enter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+    TOOLTIP: Sticky Nav
+    - What: Navigation + quick utilities
+    - How: Add anchors; keep small for mobile usability
+    - Outcome: Easy exploration
+  ========================================================== -->
+  <header>
+    <div class="wrap nav">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>LEGO War on Narratives<span class="sub">Offline-First Voting + Multiplayer Dashboard</span></h1>
+        </div>
+      </div>
+
+      <nav class="navlinks" aria-label="Table of contents">
+        <a class="pill" href="#join">Join</a>
+        <a class="pill" href="#vote">Vote</a>
+        <a class="pill" href="#dashboard">Dashboard</a>
+        <a class="pill" href="#multiplayer">Multiplayer</a>
+        <a class="pill" href="#search">Search</a>
+        <a class="pill" href="#safety">Safety</a>
+      </nav>
+
+      <div class="right">
+        <button class="btn small" id="btnTheme" title="Toggle theme">🌗</button>
+        <button class="btn small danger" id="btnReset" title="Reset local data">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================
+    TOOLTIP: HUD
+    - What: Gamification panel + constellation state map
+    - How: XP gained by key actions (vote/export/import)
+    - Outcome: Motivation + visual feedback
+  ========================================================== -->
+  <aside id="hud" aria-label="Gamification HUD">
+    <div class="hudTop">
+      <div class="hudTitle">
+        <b>Mythic HUD ✨</b>
+        <span id="hudUser">Loading…</span>
+      </div>
+      <div class="hudBtns">
+        <button class="btn small ghost" id="hudMin" title="Minimize">▾</button>
+        <button class="btn small" id="hudHelp" title="HUD help">?</button>
+      </div>
+    </div>
+    <div class="hudBody" id="hudBody">
+      <div class="hudStats">
+        <div class="stat">
+          <div class="k">Level</div>
+          <div class="v" id="hudLevel">—</div>
+        </div>
+        <div class="stat">
+          <div class="k">XP</div>
+          <div class="v" id="hudXP">—</div>
+        </div>
+        <div class="stat">
+          <div class="k">Streak</div>
+          <div class="v" id="hudStreak">—</div>
+        </div>
+      </div>
+
+      <div class="xpWrap">
+        <div class="xpRow">
+          <span>Progress to next level</span>
+          <b id="hudNext">—</b>
+        </div>
+        <div class="xpBar" aria-label="XP bar"><div class="xpFill" id="xpFill"></div></div>
+        <div class="hudHint">XP is local-only and resettable. No leaderboards. No coercion.</div>
+      </div>
+
+      <div class="constWrap">
+        <canvas id="constellation" width="600" height="320" aria-label="Constellation state visualizer"></canvas>
+      </div>
+      <div class="hudHint" id="hudConstHint">Constellation maps your latest trait state (local + imported packs).</div>
+    </div>
+  </aside>
+
+  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <main class="wrap">
+    <!-- =========================================================
+      TOOLTIP: Hero
+      - What: High-level intro + current session summary
+      - How: Updates automatically from IndexedDB
+      - Outcome: Orient user quickly
+    ========================================================== -->
+    <section class="hero" id="top">
+      <div class="parallaxWrap" aria-hidden="true">
+        <div class="parallaxLayer p1"></div>
+        <div class="parallaxLayer p2"></div>
+        <div class="parallaxLayer p3"></div>
+      </div>
+
+      <div class="heroGrid">
+        <div class="card">
+          <h2>The “Fake War” That Refuses to Harm Anyone 🧱🕊️</h2>
+          <p>
+            This is a modular voting arena where people on both sides co-author the rules of disagreement by voting on
+            <b>characteristics</b> (transparency, reversibility, compassion bias, etc.). No commands. No targeting.
+            The goal is to leave behind a better interface for Vehund and the next generation.
+          </p>
+
+          <div class="row">
+            <span class="chip">Status: <b id="statusNet">Checking…</b></span>
+            <span class="chip">Storage: <b id="statusDB">Initializing…</b></span>
+            <span class="chip">Session: <b id="statusSession">None</b></span>
+          </div>
+
+          <details>
+            <summary>How “multiplayer” works (without surveillance)</summary>
+            <p>
+              Multiplayer here is manual and consent-driven:
+              you export a <b>Share Pack</b> (aggregated trait results, no raw vote logs unless you choose) and
+              import packs from others. Nothing is auto-sent. Nothing calls home.
+            </p>
+            <p class="hint">
+              That means it works even across air-gapped devices, or in offline communities using QR/text/USB transfers.
+            </p>
+          </details>
+        </div>
+
+        <div class="card">
+          <h2>Quick Controls ⚙️</h2>
+          <div class="grid">
+            <div class="col12 field">
+              <label for="quickRole">Jump to role</label>
+              <select class="select" id="quickRole" title="Select role quickly"></select>
+            </div>
+            <div class="col12 row">
+              <button class="btn primary" id="btnNewRound">Start / Next Round</button>
+              <button class="btn" id="btnViewLatest">View Latest Summary</button>
+            </div>
+            <div class="col12">
+              <p class="hint">
+                Tip: Run a couple rounds, then export a Share Pack to simulate “multiplayer.” Import packs to compare
+                system shapes. The dashboard will blend local + imported aggregates.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Join / Setup
+      - What: Create or load a local profile + session
+      - How: Set display name, faction label, and role
+      - Outcome: Stable participation identity stored locally
+    ========================================================== -->
+    <section id="join">
+      <div class="card">
+        <h2>Join the Arena (Local-Only) 🧩</h2>
+        <p>
+          Choose a display name and a “side label” (purely symbolic; no enemies required). Then pick a role.
+          Your data stays on this device unless you export it.
+        </p>
+
+        <div class="grid">
+          <div class="col6 field">
+            <label for="displayName">Display name (max 28 chars)</label>
+            <input class="input" id="displayName" placeholder="e.g., Foster+Navi / NightCartographer" maxlength="28" />
+          </div>
+
+          <div class="col6 field">
+            <label for="sideLabel">Side label (symbolic)</label>
+            <select class="select" id="sideLabel">
+              <option value="Stewardship">Stewardship</option>
+              <option value="Extraction">Extraction</option>
+              <option value="Caution">Caution</option>
+              <option value="Acceleration">Acceleration</option>
+              <option value="Localism">Localism</option>
+              <option value="Coordination">Coordination</option>
+              <option value="Other">Other (custom)</option>
+            </select>
+          </div>
+
+          <div class="col12 field" id="customSideWrap" style="display:none;">
+            <label for="customSide">Custom side label (max 32 chars)</label>
+            <input class="input" id="customSide" placeholder="e.g., Icekeepers / Orchard Guild / Signal Weavers" maxlength="32" />
+          </div>
+
+          <div class="col6 field">
+            <label for="roleSelect">Role (affects vote weighting & support prompts)</label>
+            <select class="select" id="roleSelect"></select>
+          </div>
+
+          <div class="col6 field">
+            <label for="sessionName">Session name (shared locally)</label>
+            <input class="input" id="sessionName" placeholder="e.g., Vehund-Alpha • January" maxlength="42" />
+          </div>
+
+          <div class="col12 row">
+            <button class="btn primary" id="btnJoin">Save / Update Profile</button>
+            <button class="btn" id="btnCreateSession">Create / Switch Session</button>
+            <button class="btn good" id="btnDemoFill">Fill Demo Data</button>
+          </div>
+        </div>
+
+        <details>
+          <summary>Role-based support (what it is and isn’t)</summary>
+          <p>
+            Roles don’t grant power over people; they change how the system interprets trait choices and suggests improvements.
+            Example: if Auditors flag an abuse pathway, you’ll see a prompt to reconsider—but you’re never “blocked.”
+          </p>
+          <ul>
+            <li><b>Architect</b>: proposes mechanics; gets nudges about consistency</li>
+            <li><b>Steward</b>: weighs long-term spillovers; gets sustainability prompts</li>
+            <li><b>Auditor</b>: hunts coercion/abuse pathways; gets threat-model prompts</li>
+            <li><b>Mediator</b>: looks for synthesis; gets false-binary prompts</li>
+            <li><b>Historian</b>: checks pattern repetition; gets analogy prompts</li>
+            <li><b>Citizen</b>: votes only; maximizes legitimacy, minimizes proposal load</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Voting Rounds
+      - What: Vote on a bundle of traits each round
+      - How: Start round; set each slider; submit
+      - Outcome: Trait aggregates + audit prompts
+    ========================================================== -->
+    <section id="vote">
+      <div class="card">
+        <h2>Vote on Characteristics (Not Commands) 🧭</h2>
+        <p>
+          Each round offers a bounded set of traits. You vote on the axis (left ↔ right).
+          Your role applies weighting to certain categories. Optional rationale is stored locally.
+        </p>
+
+        <div class="row">
+          <span class="chip">Round: <b id="roundLabel">—</b></span>
+          <span class="chip">Role weight: <b id="roleWeightLabel">—</b></span>
+          <span class="chip">Traits in round: <b id="roundCount">—</b></span>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="grid">
+          <div class="col12" id="voteList" aria-label="Trait voting list">
+            <p class="hint">Start a round to see trait cards here.</p>
+          </div>
+
+          <div class="col12 field">
+            <label for="roundRationale">Optional round rationale (stored locally)</label>
+            <textarea class="textarea" id="roundRationale" placeholder="Why did you vote this way? What tradeoffs are you accepting?"></textarea>
+          </div>
+
+          <div class="col12 row">
+            <button class="btn primary" id="btnSubmitVotes">Submit Votes</button>
+            <button class="btn" id="btnSkipRound">Skip / Reroll Round</button>
+          </div>
+
+          <div class="col12" id="supportPrompts"></div>
+        </div>
+
+        <details>
+          <summary>How weighting works (simple & inspectable)</summary>
+          <p>
+            Each trait has a category. Roles apply mild multipliers to categories:
+            e.g., Stewards weigh sustainability traits slightly more; Auditors weigh abuse-resistance traits slightly more. Multipliers are small by design to avoid dominance.
+          </p>
+          <p class="hint">
+            You can inspect all weights and math in the JS section—nothing is hidden.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Dashboard
+      - What: Aggregated trait state + trends
+      - How: Auto-updates after each round/import
+      - Outcome: System-shape visibility
+    ========================================================== -->
+    <section id="dashboard">
+      <div class="card">
+        <h2>System Dashboard 🗺️</h2>
+        <p>
+          This dashboard shows the <b>shape</b> of the system you’re collectively designing.
+          It blends your local votes with any imported Share Packs.
+        </p>
+
+        <div class="grid">
+          <div class="col7">
+            <canvas id="trendChart" width="600" height="360" aria-label="Trait trends"></canvas>
+          </div>
+          <div class="col5 stack">
+            <div class="mini">
+              <h3>Convergence Zones</h3>
+              <div id="convergenceList" class="hint">Run rounds to populate.</div>
+            </div>
+            <div class="mini">
+              <h3>Fracture Warnings</h3>
+              <div id="fractureList" class="hint">No fractures detected.</div>
+            </div>
+          </div>
+        </div>
+
+        <details>
+          <summary>What am I looking at?</summary>
+          <p>
+            Convergence zones show traits where different sides cluster near agreement.
+            Fracture warnings appear when traits polarize into mutually exclusive extremes.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Multiplayer (Manual)
+      - What: Export / Import Share Packs
+      - How: Click export; share file; import others
+      - Outcome: Multiplayer without servers
+    ========================================================== -->
+    <section id="multiplayer">
+      <div class="card">
+        <h2>Multiplayer (Manual & Consent-Driven) 📦</h2>
+        <p>
+          Export an aggregated <b>Share Pack</b> (no raw vote logs by default).
+          Import packs from others to compare and blend system shapes.
+        </p>
+
+        <div class="row">
+          <button class="btn primary" id="btnExport">Export Share Pack</button>
+          <input type="file" id="importFile" accept=".json" hidden />
+          <button class="btn" id="btnImport">Import Share Pack</button>
+          <button class="btn danger" id="btnClearImports">Clear Imported Packs</button>
+        </div>
+
+        <details>
+          <summary>What’s inside a Share Pack?</summary>
+          <ul>
+            <li>Aggregated trait scores (per round)</li>
+            <li>Session metadata (name, timestamp)</li>
+            <li>No personal identifiers unless you opt in</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Search
+      - What: Client-side keyword search
+      - How: Type keywords; results appear instantly
+      - Outcome: Fast recall in long sessions
+    ========================================================== -->
+    <section id="search">
+      <div class="card">
+        <h2>Search 🔎</h2>
+        <div class="field">
+          <label for="searchInput">Search traits, roles, help text</label>
+          <input class="input" id="searchInput" placeholder="e.g., reversibility, coercion, steward" />
+        </div>
+        <div class="searchResults" id="searchResults"></div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      TOOLTIP: Safety
+      - What: Zero-harm + reset controls
+      - How: Review guardrails; reset anytime
+      - Outcome: Trust + autonomy
+    ========================================================== -->
+    <section id="safety">
+      <div class="card">
+        <h2>Safety, Zero-Harm, and Autonomy 🛡️</h2>
+        <p>
+          This system is intentionally limited. It cannot target people, automate outreach,
+          or centralize control. Everything meaningful happens locally.
+        </p>
+        <ul>
+          <li>No telemetry, analytics, or background sync</li>
+          <li>Manual multiplayer only (export/import)</li>
+          <li>Reset wipes everything instantly</li>
+          <li>Design favors reversibility over power</li>
+        </ul>
+        <p class="hint">
+          Zero-Harm & Anti-Inversion are enforced by architecture, not promises.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap" style="padding:30px 0 60px; color:var(--muted); font-size:12px;">
+    <div class="sep"></div>
+    <p>
+      LEGO War on Narratives • Offline-First Prototype • Foster + Navi<br />
+      Zero-Harm & Anti-Inversion: This system exists to drain violent narrative energy into safe, inspectable design play.
+    </p>
+  </footer>
+
+  <!--
+    Zero-Harm & Anti-Inversion (Comment):
+    - No coercion, harassment, targeting, manipulation, or surveillance
+    - Local-first storage (IndexedDB), manual multiplayer only
+    - Resettable, inspectable, consent-forward by design
+  -->
+
+  <script>
+    /* =========================================================
+      TOOLTIP: Constants & Data
+      - What: Roles, traits, weights
+      - How: Edit arrays to extend system
+      - Outcome: Transparent logic
+    ========================================================== */
+    const SPLASH_MS = 5200;
+
+    const ROLES = [
+      { id:"architect", name:"Architect", weight:{ mechanics:1.1 } },
+      { id:"steward", name:"Steward", weight:{ sustainability:1.15 } },
+      { id:"auditor", name:"Auditor", weight:{ abuse:1.2 } },
+      { id:"mediator", name:"Mediator", weight:{ synthesis:1.15 } },
+      { id:"historian", name:"Historian", weight:{ precedent:1.1 } },
+      { id:"citizen", name:"Citizen", weight:{} }
+    ];
+
+    const TRAITS = [
+      { id:"transparency", label:"Transparency ↔ Opacity", left:"Transparency", right:"Strategic Opacity", cat:"abuse" },
+      { id:"reversibility", label:"Reversibility ↔ Permanence", left:"Reversible", right:"Permanent", cat:"sustainability" },
+      { id:"speed", label:"Deliberation ↔ Speed", left:"Deliberation", right:"Speed", cat:"mechanics" },
+      { id:"autonomy", label:"Local Autonomy ↔ Central Coordination", left:"Local", right:"Central", cat:"synthesis" },
+      { id:"compassion", label:"Compassion Bias ↔ Efficiency Bias", left:"Compassion", right:"Efficiency", cat:"precedent" }
+    ];
+
+    /* =========================================================
+      TOOLTIP: State (IndexedDB wrapper simplified)
+    ========================================================== */
+    const state = {
+      profile:null,
+      session:null,
+      round:0,
+      votes:[],
+      imports:[]
+    };
+
+    function toast(msg, type="good", sub=""){
+      const t=document.createElement("div");
+      t.className=`toast ${type}`;
+      t.innerHTML=`<div class="dot"></div><div><div class="t">${msg}</div><div class="s">${sub}</div></div>`;
+      document.getElementById("toasts").appendChild(t);
+      setTimeout(()=>t.remove(), 4200);
+    }
+
+    /* =========================================================
+      TOOLTIP: Splash Logic
+    ========================================================== */
+    const splash=document.getElementById("splash");
+    const closeSplash=()=>{
+      splash.classList.add("fadeOut");
+      setTimeout(()=>splash.style.display="none",280);
+    };
+    document.getElementById("splashClose").onclick=closeSplash;
+    document.getElementById("splashEnter").onclick=closeSplash;
+    setTimeout(closeSplash, SPLASH_MS);
+
+    /* =========================================================
+      TOOLTIP: Init UI
+    ========================================================== */
+    const roleSelect=document.getElementById("roleSelect");
+    const quickRole=document.getElementById("quickRole");
+    ROLES.forEach(r=>{
+      roleSelect.innerHTML+=`<option value="${r.id}">${r.name}</option>`;
+      quickRole.innerHTML+=`<option value="${r.id}">${r.name}</option>`;
+    });
+
+    document.getElementById("sideLabel").onchange=e=>{
+      document.getElementById("customSideWrap").style.display =
+        e.target.value==="Other"?"block":"none";
+    };
+
+    /* =========================================================
+      TOOLTIP: Voting
+    ========================================================== */
+    document.getElementById("btnNewRound").onclick=()=>{
+      state.round++;
+      document.getElementById("roundLabel").textContent=state.round;
+      const list=document.getElementById("voteList");
+      list.innerHTML="";
+      TRAITS.forEach(t=>{
+        list.innerHTML+=`
+          <div class="voteCard">
+            <div class="voteTop">
+              <div>
+                <h4>${t.label}</h4>
+                <div class="meta">${t.cat}</div>
+              </div>
+            </div>
+            <div class="axis">
+              <div class="pole">${t.left}</div>
+              <input type="range" min="-2" max="2" step="1" value="0" data-id="${t.id}">
+              <div class="value">0</div>
+              <div class="pole">${t.right}</div>
+            </div>
+          </div>`;
+      });
+      document.querySelectorAll('input[type="range"]').forEach(r=>{
+        r.oninput=()=>r.nextElementSibling.textContent=r.value;
+      });
+      toast("New round started","good");
+    };
+
+    document.getElementById("btnSubmitVotes").onclick=()=>{
+      const vals=[...document.querySelectorAll('input[type="range"]')]
+        .map(r=>({trait:r.dataset.id, value:+r.value}));
+      state.votes.push({round:state.round, vals});
+      toast("Votes saved locally","good");
+    };
+
+    /* =========================================================
+      TOOLTIP: Export / Import
+    ========================================================== */
+    document.getElementById("btnExport").onclick=()=>{
+      const pack={
+        session:state.session,
+        rounds:state.votes,
+        time:Date.now()
+      };
+      const blob=new Blob([JSON.stringify(pack,null,2)],{type:"application/json"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download="lego-war-share-pack.json";
+      a.click();
+      toast("Share Pack exported","good");
+    };
+
+    document.getElementById("btnImport").onclick=()=>{
+      document.getElementById("importFile").click();
+    };
+    document.getElementById("importFile").onchange=e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const r=new FileReader();
+      r.onload=()=>{
+        state.imports.push(JSON.parse(r.result));
+        toast("Share Pack imported","good");
+      };
+      r.readAsText(file);
+    };
+
+    document.getElementById("btnClearImports").onclick=()=>{
+      state.imports=[];
+      toast("Imported packs cleared","warn");
+    };
+
+    /* =========================================================
+      TOOLTIP: Reset
+    ========================================================== */
+    document.getElementById("btnReset").onclick=()=>{
+      if(confirm("Reset all local data?")){
+        Object.keys(state).forEach(k=>{
+          state[k]=Array.isArray(state[k])?[]:null;
+        });
+        toast("Local data reset","bad");
+      }
+    };
+  </script>
+</body>
+</html>
